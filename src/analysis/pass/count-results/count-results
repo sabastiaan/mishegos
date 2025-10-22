@@ -1,0 +1,46 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# count-success-groups: pass-through + summary
+# - Emits every input line unchanged to STDOUT (no filtering)
+# - At EOF, prints to STDERR:
+#     0 success: X results
+#     1 success: Y results
+#     ...
+#   based on how many decoder workers reported success (status.value == 1)
+
+require "json"
+
+def success?(dec)
+  dec && dec[:status] && dec[:status][:value] == 1
+end
+
+warn "[+] pass: count-success-groups"
+
+group_counts = Hash.new(0)
+processed = 0
+max_group = 0
+parse_errors = 0
+
+$stdin.each_line do |line|
+  # Always pass the line through unchanged
+  $stdout.puts line
+  processed += 1
+
+  # Try to parse and count successes; keep going on errors
+  begin
+    obj = JSON.parse(line, symbolize_names: true)
+    outputs = obj[:outputs] || []
+    n_succ = outputs.count { |o| success?(o) }
+    group_counts[n_succ] += 1
+    max_group = n_succ if n_succ > max_group
+  rescue JSON::ParserError => e
+    parse_errors += 1
+    warn "[!] line #{processed}: JSON parse error: #{e.message}"
+  end
+end
+
+warn "[+] pass: count-success-groups summary (processed=#{processed}, parse_errors=#{parse_errors})"
+(0..max_group).each do |k|
+  warn "#{k} success: #{group_counts[k]} results"
+end

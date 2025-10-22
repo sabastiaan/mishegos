@@ -78,15 +78,16 @@ xed-underaccept:
   - normalize
 
 xed-zydis-different:
-  - filter-all-success
   - dedupe
   - filter-xed-zydis-different
   - minimize-input
   - normalize
-
 
 only-failures:
   - filter-any-success
   - dedpue
   - minimize-input
   - noramlize
+
+count_results:
+  - count-results
