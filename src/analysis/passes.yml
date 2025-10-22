@@ -73,7 +73,20 @@ xed-underaccept:
   - filter-all-success
   - filter-ndecoded-same
   - dedupe
-  - filter-bddisasm-salc
   - filter-xed-find-underaccept
   - minimize-input
   - normalize
+
+xed-zydis-different:
+  - filter-all-success
+  - dedupe
+  - filter-xed-zydis-different
+  - minimize-input
+  - normalize
+
+
+only-failures:
+  - filter-any-success
+  - dedpue
+  - minimize-input
+  - noramlize

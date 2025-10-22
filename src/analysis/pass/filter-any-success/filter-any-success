@@ -1,0 +1,22 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# filter-any-success: remove any cohorts in which each worker success
+
+require "json"
+
+warn "[+] pass: filter-any-success"
+
+count = 0
+$stdin.each_line do |line|
+  result = JSON.parse line, symbolize_names: true
+
+  if result[:outputs].any? { |o| o[:status][:name] == "success" }
+    count += 1
+    next
+  end
+
+  $stdout.puts result.to_json
+end
+
+warn "[+] pass: filter-any-success done: #{count} filtered"

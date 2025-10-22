@@ -1,5 +1,4 @@
-WORKERS = bfd \
-	capstone \
+WORKERS = capstone \
 	dynamorio \
 	fadec \
 	xed \

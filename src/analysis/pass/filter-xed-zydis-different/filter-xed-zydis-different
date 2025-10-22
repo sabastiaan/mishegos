@@ -1,0 +1,52 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# filter-xed-zydis-ndecoded-disagree: keep inputs where XED and Zydis
+# both succeed but report different :ndecoded lengths.
+
+require "json"
+
+XED_SO   = "./src/worker/xed/xed.so"
+ZYDIS_SO = "./src/worker/zydis/zydis.so"
+
+def success?(dec)
+  dec && dec[:status] && dec[:status][:value] == 1
+end
+
+def ndecoded(dec)
+  # Some workers might omit ndecoded on failure; coerce to integer when present.
+  dec && dec.key?(:ndecoded) ? dec[:ndecoded].to_i : nil
+end
+
+warn "[+] pass: filter-xed-zydis-ndecoded-disagree"
+
+processed = 0
+kept = 0
+
+$stdin.each_line do |line|
+  begin
+    result = JSON.parse(line, symbolize_names: true)
+  rescue JSON::ParserError => e
+    warn "[!] skipping line #{processed + 1}: JSON parse error: #{e.message}"
+    processed += 1
+    next
+  end
+
+  outputs = result[:outputs] || []
+  xed   = outputs.find { |o| o[:worker_so] == XED_SO }
+  zydis = outputs.find { |o| o[:worker_so] == ZYDIS_SO }
+
+  if xed && zydis && success?(xed) && success?(zydis)
+    xn = ndecoded(xed)
+    zn = ndecoded(zydis)
+
+    if !xn.nil? && !zn.nil? && xn != zn
+      $stdout.puts result.to_json
+      kept += 1
+    end
+  end
+
+  processed += 1
+end
+
+warn "[+] pass: filter-xed-zydis-ndecoded-disagree done: processed=#{processed} kept=#{kept}"

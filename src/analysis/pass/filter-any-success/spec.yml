@@ -1,0 +1,3 @@
+name: filter-any-success
+desc: Remove any cohorts in which each worker success
+run: filter-any-success

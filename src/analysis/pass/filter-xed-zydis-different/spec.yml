@@ -1,0 +1,3 @@
+name: filter-xed-zydis-different
+desc: Find results that XED and Zydis differ on
+run: filter-xed-zydis-different
