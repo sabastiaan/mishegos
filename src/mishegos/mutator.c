@@ -3,6 +3,7 @@
 #include "mish_common.h"
 
 #include <err.h>
+#include <stdlib.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -398,6 +399,57 @@ static bool manual_candidate(input_slot *slot) {
   return true;
 }
 
+/* =========================
+ * File-backed mutator
+ * =========================
+ *
+ * Reads instruction candidates from a specified file, one per line,
+ * in the same hex format as the manual mutator (no 0x or \x prefixes).
+ * The file path may be specified inline via the mutator name:
+ *   "file:/path/to/inputs.txt" or "file=/path/to/inputs.txt"
+ * or via the environment variable MISHEGOS_MUTATOR_FILE by using:
+ *   "file"
+ */
+static FILE *file_mut_fp = NULL;
+static const char *file_mut_path = NULL;
+
+static bool file_candidate(input_slot *slot) {
+  if (file_mut_fp == NULL) {
+    if (file_mut_path == NULL || *file_mut_path == '\0') {
+      errx(1, "file mutator not configured with a path");
+    }
+    file_mut_fp = fopen(file_mut_path, "r");
+    if (file_mut_fp == NULL) {
+      err(1, "failed to open mutator input file '%s'", file_mut_path);
+    }
+  }
+
+  char *line = NULL;
+  size_t cap = 0;
+  if (getline(&line, &cap, file_mut_fp) < 0) {
+    /* Input exhausted (or error): close and signal no more candidates. */
+    if (file_mut_fp) {
+      fclose(file_mut_fp);
+      file_mut_fp = NULL;
+    }
+    free(line);
+    return false;
+  }
+
+  line[strcspn(line, "\r\n")] = '\0';
+  size_t linelen = strlen(line);
+  if (linelen == 0 || linelen > MISHEGOS_INSN_MAXLEN * 2) {
+    free(line);
+    return false;
+  }
+
+  hex2bytes(slot->raw_insn, line, linelen);
+  slot->len = linelen / 2;
+
+  free(line);
+  return true;
+}
+
 mutator_t mutator_create(const char *name) {
   mish_getrandom(rng_state, sizeof(rng_state), 0);
 
@@ -413,5 +465,18 @@ mutator_t mutator_create(const char *name) {
     return havoc_candidate;
   else if (!strcmp(name, "manual"))
     return manual_candidate;
+  else if (name && (!strncmp(name, "file:", 5) || !strncmp(name, "file=", 5))) {
+    /* Path provided inline as file:/path or file=/path */
+    file_mut_path = name + 5;
+    return file_candidate;
+  } else if (!strcmp(name, "file")) {
+    /* Path provided via environment variable */
+    const char *p = getenv("MISHEGOS_MUTATOR_FILE");
+    if (p == NULL || *p == '\0') {
+      errx(1, "file mutator requires a path: use 'file:/path' or set MISHEGOS_MUTATOR_FILE");
+    }
+    file_mut_path = p;
+    return file_candidate;
+  }
   errx(1, "invalid mutator: %s", name);
 }
